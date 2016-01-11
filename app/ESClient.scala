@@ -1,9 +1,14 @@
 package lila.search
 
 import scala.concurrent.Future
+import scala.collection.JavaConverters._
+import scala.util.{Success, Failure}
+
+import org.elasticsearch.search.aggregations.bucket.terms.{ Terms }
 
 import com.sksamuel.elastic4s.ElasticDsl.{ RichFuture => _, _ }
 import com.sksamuel.elastic4s.mappings.{ TypedFieldDefinition }
+import com.sksamuel.elastic4s.analyzers.{ AnalyzerDefinition, CustomAnalyzerDefinition }
 import com.sksamuel.elastic4s.{ ElasticDsl, ElasticClient }
 import play.api.libs.json._
 
@@ -63,6 +68,15 @@ final class ESClient(client: ElasticClient) {
       ) shards 1 replicas 0 refreshInterval "30s"
     }
 
+  def putMappingWithAnalysis(index: Index, fields: Seq[TypedFieldDefinition], analysisDefinitions: Seq[AnalyzerDefinition]) =
+    client.execute {
+      ElasticDsl.create index index.name mappings (
+        mapping(index.name) fields fields
+      ) shards 1 replicas 0 refreshInterval "30s" analysis (
+        analysisDefinitions
+      )
+    }
+
   def aliasTo(tempIndex: Index, mainIndex: Index) = {
     writeable = false
     deleteIndex(mainIndex) >> client.execute {
@@ -72,6 +86,29 @@ final class ESClient(client: ElasticClient) {
     } >> client.execute {
       ElasticDsl forceMerge mainIndex.name
     }
+  }
+
+
+
+  //       """{ "filtered": { "query": { "match_phrase_prefix": { "m" : """""+ ((obj \ "moves").as[String]) +""""" } } } }"""
+
+
+  def gameExplorer(obj: JsObject) = {
+    val moves = (obj \ "moves").as[String]
+    var nMoves = 0
+    if (moves.length > 0) {
+      nMoves = moves.split(" ").length
+    }
+
+    client execute {
+      ElasticDsl.search in "game"->"game" query {
+        queryStringQuery(s"m:$moves*") analyzer("moves_analyzer")
+      } aggs (
+        aggregation terms "nextmoves" field "m" aggs (
+          aggregation terms "winners" field "c"
+        ) script s"_value.split(' ')[$nMoves]" size 10 
+      ) size 0
+    } map ExplorerResponse.apply
   }
 
   private def deleteIndex(index: Index) =

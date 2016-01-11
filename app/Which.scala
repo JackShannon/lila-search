@@ -11,6 +11,11 @@ object Which {
     case _                 => None
   }
 
+  def analysis(index: Index) = index match {
+    case Index(_, "game")  => Some(game.Analysis.definitions)
+    case _                 => None
+  }
+
   def query(index: Index)(obj: JsObject): Option[Query] = index match {
     case Index(_, "game")  => game.Query.jsonReader.reads(obj).asOpt: Option[Query]
     case Index(_, "forum") => forum.Query.jsonReader.reads(obj).asOpt: Option[Query]

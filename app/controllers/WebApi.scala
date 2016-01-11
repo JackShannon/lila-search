@@ -51,7 +51,10 @@ class WebApi @Inject() (
     Which mapping Index(index, typ) match {
       case None => fuccess(NotFound(s"No such mapping: $index/$typ"))
       case Some(mapping) =>
-        client.putMapping(Index(index, typ), mapping) inject Ok(s"put $index/$typ mapping")
+        Which analysis Index(index, typ) match {
+          case None => client.putMapping(Index(index, typ), mapping) inject Ok(s"put $index/$typ mapping")
+          case Some(analysis) => client.putMappingWithAnalysis(Index(index, typ), mapping, analysis) inject Ok(s"put $index/$typ mapping with analysis")
+        }
     }
   }
 
@@ -64,6 +67,12 @@ class WebApi @Inject() (
 
   def alias(temp: String, main: String) = Action.async {
     client.aliasTo(Index(temp), Index(main)) inject Ok(s"aliased temp:$temp to main:$main")
+  }
+
+  def gameExplorer() = JsObjectBody { obj =>
+    client.gameExplorer(obj) map { res =>
+      Ok(res.moves)
+    }
   }
 
   private def JsObjectBody(f: JsObject => Fu[Result]) =

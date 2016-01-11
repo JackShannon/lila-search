@@ -6,6 +6,7 @@ import org.joda.time.DateTime
 
 import com.sksamuel.elastic4s.ElasticDsl.{ RichFuture => _, _ }
 import com.sksamuel.elastic4s.mappings.FieldType._
+import com.sksamuel.elastic4s.analyzers._
 
 object Fields {
   val status = "s"
@@ -24,6 +25,7 @@ object Fields {
   val whiteUser = "wu"
   val blackUser = "bu"
   val source = "so"
+  val moves = "m"
 }
 
 object Mapping {
@@ -33,19 +35,29 @@ object Mapping {
     field(turns) typed ShortType,
     field(rated) typed BooleanType,
     field(perf) typed ShortType,
-    field(uids) typed StringType,
-    field(winner) typed StringType,
+    field(uids) typed StringType index "not_analyzed",
+    field(winner) typed StringType index "not_analyzed",
     field(winnerColor) typed ShortType,
     field(averageRating) typed ShortType,
     field(ai) typed ShortType,
-    field(opening) typed StringType,
+    field(opening) typed StringType index "not_analyzed",
     field(date) typed DateType format Date.format,
     field(duration) typed IntegerType,
     field(analysed) typed BooleanType,
-    field(whiteUser) typed StringType,
-    field(blackUser) typed StringType,
-    field(source) typed ShortType
-  ).map(_ index "not_analyzed")
+    field(whiteUser) typed StringType index "not_analyzed",
+    field(blackUser) typed StringType index "not_analyzed",
+    field(source) typed ShortType,
+    field(moves) typed StringType analyzer "moves_analyzer"
+  )
+}
+
+object Analysis {
+  def definitions = Seq(
+    CustomAnalyzerDefinition(
+      "moves_analyzer",
+      edgeNGramTokenizer("moves_tokenizer").minMaxGrams(2, 100).tokenChars("letter", "digit", "whitespace", "punctuation")
+    )
+  )
 }
 
 case class Query(
